@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./app:/app/app
+      - ./static:/app/static
+      - ./samples:/app/samples

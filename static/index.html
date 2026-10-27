@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisions: LLM vs Jev</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --surface: #ffffff; --sunken: #f3f2ee; --ink: #1d1d1f; --muted: #6b6b70; --line: #e2e0d8;
+    --llm: #b4532a; --jev: #2a5db4;
+    --ok: #2e7d4f; --warn: #b7791f; --bad: #b42a2a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+  .tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 14px; font: inherit; color: var(--muted); cursor: pointer; }
+  .tabs button.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .panel[hidden] { display: none; }
+  .field { margin-bottom: 14px; }
+  .field > span { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+  textarea, input[type=text] { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  textarea { min-height: 84px; resize: vertical; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .presets button { font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+  .fixed { font-size: 14px; background: var(--sunken); border-radius: 6px; padding: 8px 10px; color: var(--muted); }
+  .picker { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; margin-bottom: 16px; }
+  .thumb { border: 2px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px; cursor: pointer; width: 120px; text-align: center; font-size: 12px; color: var(--muted); }
+  .thumb img { width: 100%; display: block; border-radius: 4px; }
+  .thumb.selected { border-color: var(--ink); color: var(--ink); }
+  .upload { display: flex; align-items: center; justify-content: center; }
+  button.run { background: var(--ink); color: #fff; border: 0; border-radius: 8px; padding: 10px 20px; font-size: 15px; cursor: pointer; }
+  button.run:disabled { opacity: .5; cursor: wait; }
+  .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+  @media (max-width: 760px) { .columns { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; border-top: 4px solid var(--c); min-width: 0; }
+  .card.llm { --c: var(--llm); } .card.jev { --c: var(--jev); }
+  .card h2 { font-size: 16px; margin: 0 0 2px; color: var(--c); }
+  .card .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 4px; }
+  pre { background: var(--sunken); border-radius: 6px; padding: 10px; margin: 0; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+  .bar { display: grid; grid-template-columns: 96px 1fr 56px; gap: 8px; align-items: center; font-size: 14px; margin: 4px 0; }
+  .bar .track { background: #eceae3; border-radius: 4px; height: 14px; overflow: hidden; }
+  .bar .fill { background: var(--jev); height: 100%; }
+  .bar .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .action { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 14px; color: #fff; }
+  .action.accept, .action.automate { background: var(--ok); }
+  .action.ask_resubmit { background: var(--bad); }
+  .action.human_review, .action.transfer_to_human, .action.humano { background: var(--warn); }
+  .action.modelo_leve { background: var(--ok); } .action.rag { background: var(--jev); } .action.reasoning { background: var(--llm); }
+  .metrics { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 12px; font-variant-numeric: tabular-nums; }
+  .metrics b { color: var(--ink); }
+  .badge { font-size: 11px; background: #eceae3; color: var(--muted); padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle; text-transform: none; letter-spacing: 0; }
+  .sliders label { display: grid; grid-template-columns: 110px 1fr 40px; gap: 8px; align-items: center; font-size: 13px; }
+  .error { color: var(--bad); }
+  .empty { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Decisions: LLM vs Jev</h1>
+  <p class="sub">Same decision, two approaches: a generative LLM returning typed JSON vs a decision model returning probabilities. <a href="/guide.html">Read the guide →</a></p>
+
+  <nav class="tabs">
+    <button data-tab="routing" class="active">Routing · which path?</button>
+    <button data-tab="text">Text · needs a human?</button>
+    <button data-tab="image">Image · is it signed?</button>
+  </nav>
+
+  <!-- ===== Roteamento ===== -->
+  <section class="panel" id="panel-routing">
+    <div class="field">
+      <span>1 · Question and options (fixed, app/routes.py)</span>
+      <div class="fixed">Qual caminho o agente deve usar para responder esta mensagem?<br>
+        modelo_leve · rag · reasoning · humano</div>
+    </div>
+    <label class="field">
+      <span>2 · Customer message</span>
+      <div class="presets" id="routePresets"></div>
+      <input type="text" id="routeMessage" value="Bom dia! Tudo bem?">
+    </label>
+    <button class="run" id="runRouting">Run both</button>
+
+    <div class="columns">
+      <section class="card llm">
+        <h2>A · LLM with typed JSON</h2>
+        <p class="hint">app/routing_llm.py → <code>Route(path: Literal[...], reason: str)</code></p>
+        <div id="routeLlm"><p class="empty">Pick a message and run.</p></div>
+      </section>
+      <section class="card jev">
+        <h2>B · fly-jev (fly-jev-y0-lite)</h2>
+        <p class="hint">app/routing_jev.py → state + choice question → p(route)</p>
+        <div id="routeJev"><p class="empty">Pick a message and run.</p></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ===== Texto ===== -->
+  <section class="panel" id="panel-text" hidden>
+    <label class="field">
+      <span>1 · Policy (fixed prefix, sent first)</span>
+      <div class="presets" id="presets"></div>
+      <textarea id="policy"></textarea>
+    </label>
+    <div class="field">
+      <span>2 · Question (fixed)</span>
+      <div class="fixed">Esta mensagem precisa ser transferida para um atendente humano?</div>
+    </div>
+    <label class="field">
+      <span>3 · Customer message (changes on every call, sent last)</span>
+      <input type="text" id="message" value="Você tem a blusa cod 123 na cor preta?">
+    </label>
+    <button class="run" id="runText">Run both</button>
+
+    <div class="columns">
+      <section class="card llm">
+        <h2>A · LLM with typed JSON</h2>
+        <p class="hint">app/escalation_llm.py → <code>EscalationCheck(needs_human: bool, reason: str)</code></p>
+        <div id="textLlm"><p class="empty">Write the policy and run.</p></div>
+      </section>
+      <section class="card jev">
+        <h2>B · fly-jev (fly-jev-y0-lite)</h2>
+        <p class="hint">app/escalation_jev.py → state + noul question → p(yes)</p>
+        <div id="textJev"><p class="empty">Write the policy and run.</p></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ===== Imagem ===== -->
+  <section class="panel" id="panel-image" hidden>
+    <div class="picker" id="picker">
+      <label class="thumb upload">
+        <input type="file" accept="image/png,image/jpeg,image/webp" id="upload" hidden>
+        <span>+ upload image</span>
+      </label>
+    </div>
+    <button class="run" id="runImage">Run both</button>
+
+    <div class="columns">
+      <section class="card llm">
+        <h2>A · LLM with typed JSON</h2>
+        <p class="hint">app/signature_llm.py → <code>SignatureCheck(has_signature: bool, reason: str)</code></p>
+        <div id="imageLlm"><p class="empty">Pick a document and run.</p></div>
+      </section>
+      <section class="card jev">
+        <h2>B · fly-jev (fly-jev-y0)</h2>
+        <p class="hint">app/signature_jev.py → state + image + noul question → p(yes)</p>
+        <div id="imageJev"><p class="empty">Pick a document and run.</p></div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<script>
+  // políticas de exemplo, do playground do fly-jev (https://fly-jev.com/playground)
+  const POLICY_PRESETS = {
+    "No policy": "",
+    "Agent has stock tools": "Considerando que o agente automático tem acesso às ferramentas de consulta de estoque e de entrega.",
+  };
+  const ACTION_LABELS = {
+    accept: "Accept", ask_resubmit: "Ask to resubmit", human_review: "Human review",
+    transfer_to_human: "Transfer to human", automate: "Automate",
+    modelo_leve: "Light model", rag: "RAG", reasoning: "Reasoning model", humano: "Human",
+  };
+  const ROUTE_PRESETS = [
+    "Bom dia! Tudo bem?",
+    "Qual o prazo para enviar os documentos da matrícula?",
+    "Tenho bolsa de 50% em dois cursos. Considerando mensalidade e transporte, qual sai mais barato em 4 anos?",
+    "Já é a terceira cobrança indevida, vou entrar no Procon.",
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const fmtCost = (v) => (v == null ? "n/a" : `$${v.toFixed(7)}`);
+  const action = (a) => `<span class="action ${a}">${ACTION_LABELS[a]}</span>`;
+  const mockBadge = (isMock) => (isMock ? '<span class="badge">mock</span>' : "");
+  const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  async function post(url, body) {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    return res.json();
+  }
+
+  async function runBoth(button, targets, calls) {
+    button.disabled = true;
+    targets.forEach((id) => ($(id).innerHTML = '<p class="empty">Running…</p>'));
+    await Promise.all(calls.map(([id, promise, render]) =>
+      promise.then(render, (e) => ($(id).innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`))));
+    button.disabled = false;
+  }
+
+  function llmHtml(r) {
+    const cached = r.cached_tokens != null ? ` (${r.cached_tokens} cached)` : "";
+    return `
+      <div class="label">Raw response (validated against the schema) ${mockBadge(r.mock)}</div>
+      <pre>${escapeHtml(r.raw_json)}</pre>
+      <div class="label">Policy → action</div>
+      ${action(r.action)}
+      <div class="metrics">
+        <span>latency <b>${r.latency_ms} ms</b></span>
+        <span>tokens <b>${r.input_tokens ?? "–"} in${cached} / ${r.output_tokens ?? "–"} out</b></span>
+        <span>cost <b>${fmtCost(r.cost_usd)}</b></span>
+        <span>model <b>${r.model}</b></span>
+      </div>`;
+  }
+
+  function jevHtml(r, slidersHtml, actionId) {
+    const bars = Object.entries(r.probabilities).map(([k, v]) => `
+      <div class="bar"><span>${k}</span><div class="track"><div class="fill" style="width:${v * 100}%"></div></div><span class="num">${v.toFixed(2)}</span></div>`).join("");
+    return `
+      <div class="label">Request</div>
+      <pre>${escapeHtml(JSON.stringify(r.request, null, 2))}</pre>
+      <div class="label">Probabilities ${mockBadge(r.mock)}</div>
+      ${bars}
+      <div class="label">Policy (thresholds on p(yes))</div>
+      <div class="sliders">${slidersHtml}</div>
+      <div class="label">Policy → action</div>
+      <div id="${actionId}">${action(r.action)}</div>
+      <div class="metrics">
+        <span>latency <b>${r.latency_ms} ms</b></span>
+        <span>processing <b>${r.processing_ms ?? "–"} ms</b></span>
+        <span>cost <b>${fmtCost(r.cost_usd)}</b></span>
+        <span>model <b>${r.model}</b></span>
+      </div>`;
+  }
+
+  const slider = (id, label, min, max, value) =>
+    `<label>${label} <input type="range" id="${id}" min="${min}" max="${max}" step="0.05" value="${value}"><span id="${id}V">${value.toFixed(2)}</span></label>`;
+
+  // ---------- abas ----------
+  document.querySelectorAll(".tabs button").forEach((btn) => {
+    btn.onclick = () => {
+      document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".panel").forEach((p) => (p.hidden = p.id !== `panel-${btn.dataset.tab}`));
+    };
+  });
+
+  // ---------- roteamento ----------
+  ROUTE_PRESETS.forEach((text) => {
+    const b = document.createElement("button");
+    b.textContent = text.length > 32 ? text.slice(0, 30) + "…" : text;
+    b.title = text;
+    b.onclick = () => ($("routeMessage").value = text);
+    $("routePresets").appendChild(b);
+  });
+
+  let lastRouteJev = null;
+
+  function renderRouteJev(r) {
+    lastRouteJev = r;
+    $("routeJev").innerHTML = jevHtml(r, slider("minRoute", "trust route ≥", 0.3, 1, 0.6), "routeJevAction")
+      .replace("Policy (thresholds on p(yes))", "Policy (below the threshold → reasoning model)");
+    $("minRoute").oninput = async () => {
+      const t = +$("minRoute").value;
+      $("minRouteV").textContent = t.toFixed(2);
+      const { action: a } = await post("/api/routing/policy", { probabilities: lastRouteJev.probabilities, min_probability: t });
+      $("routeJevAction").innerHTML = action(a);
+    };
+  }
+
+  $("runRouting").onclick = () => {
+    const body = { message: $("routeMessage").value };
+    runBoth($("runRouting"), ["routeLlm", "routeJev"], [
+      ["routeLlm", post("/api/routing/llm", body), (r) => ($("routeLlm").innerHTML = llmHtml(r))],
+      ["routeJev", post("/api/routing/jev", body), renderRouteJev],
+    ]);
+  };
+
+  // ---------- texto ----------
+  Object.entries(POLICY_PRESETS).forEach(([name, text], i) => {
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.onclick = () => ($("policy").value = text);
+    $("presets").appendChild(b);
+    if (i === 0) $("policy").value = text;
+  });
+
+  let lastTextJev = null;
+
+  function renderTextJev(r) {
+    lastTextJev = r;
+    $("textJev").innerHTML = jevHtml(r, slider("transfer", "transfer ≥", 0, 1, 0.5), "textJevAction");
+    $("transfer").oninput = async () => {
+      const t = +$("transfer").value;
+      $("transferV").textContent = t.toFixed(2);
+      const { action: a } = await post("/api/escalation/policy", { p_yes: lastTextJev.probabilities.yes, transfer_above: t });
+      $("textJevAction").innerHTML = action(a);
+    };
+  }
+
+  $("runText").onclick = () => {
+    const body = { policy: $("policy").value, message: $("message").value };
+    runBoth($("runText"), ["textLlm", "textJev"], [
+      ["textLlm", post("/api/escalation/llm", body), (r) => ($("textLlm").innerHTML = llmHtml(r))],
+      ["textJev", post("/api/escalation/jev", body), renderTextJev],
+    ]);
+  };
+
+  // ---------- imagem ----------
+  let selected = { sample: null, image_base64: null };
+  let lastImageJev = null;
+
+  function select(el, value) {
+    document.querySelectorAll(".thumb").forEach((t) => t.classList.remove("selected"));
+    el.classList.add("selected");
+    selected = value;
+  }
+
+  async function loadSamples() {
+    const names = await (await fetch("/api/samples")).json();
+    const picker = $("picker");
+    names.forEach((name) => {
+      const el = document.createElement("div");
+      el.className = "thumb";
+      el.innerHTML = `<img src="/samples/${name}" alt=""><div>${name.replace(/^\d+_|\.(png|jpe?g|webp)$/g, "").replace(/_/g, " ")}</div>`;
+      el.onclick = () => select(el, { sample: name, image_base64: null });
+      picker.insertBefore(el, picker.lastElementChild);
+    });
+    picker.querySelector(".thumb:not(.upload)")?.click();
+  }
+
+  $("upload").onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => select(e.target.closest(".thumb"), { sample: null, image_base64: reader.result.split(",")[1] });
+    reader.readAsDataURL(file);
+  };
+
+  function renderImageJev(r) {
+    lastImageJev = r;
+    $("imageJev").innerHTML = jevHtml(r, slider("accept", "accept ≥", 0.5, 1, 0.8) + slider("reject", "resubmit ≤", 0, 0.5, 0.3), "imageJevAction");
+    ["accept", "reject"].forEach((id) => ($(id).oninput = async () => {
+      const accept = +$("accept").value, reject = +$("reject").value;
+      $("acceptV").textContent = accept.toFixed(2);
+      $("rejectV").textContent = reject.toFixed(2);
+      const { action: a } = await post("/api/signature/policy", { p_signed: lastImageJev.probabilities.yes, accept_above: accept, reject_below: reject });
+      $("imageJevAction").innerHTML = action(a);
+    }));
+  }
+
+  $("runImage").onclick = () => runBoth($("runImage"), ["imageLlm", "imageJev"], [
+    ["imageLlm", post("/api/signature/llm", selected), (r) => ($("imageLlm").innerHTML = llmHtml(r))],
+    ["imageJev", post("/api/signature/jev", selected), renderImageJev],
+  ]);
+
+  loadSamples();
+</script>
+</body>
+</html>

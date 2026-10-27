@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisões no Agente</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --surface: #ffffff; --sunken: #f0efea; --ink: #1d1d1f; --muted: #5f6066; --line: #e2e0d8;
+    --gen: #b4532a; --gen-soft: #f7e9e2;
+    --dec: #2a5db4; --dec-soft: #e4ecf8;
+    --code: #4a4a50; --code-soft: #ecebe6;
+    --ok: #2e7d4f; --warn: #b7791f; --bad: #b42a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161618; --surface: #1f1f22; --sunken: #2a2a2e; --ink: #ececef; --muted: #a2a2aa; --line: #34343a;
+      --gen: #e08a62; --gen-soft: #3a2a22; --dec: #7aa2e8; --dec-soft: #22293a; --code: #c8c8d0; --code-soft: #2c2c31;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161618; --surface: #1f1f22; --sunken: #2a2a2e; --ink: #ececef; --muted: #a2a2aa; --line: #34343a;
+    --gen: #e08a62; --gen-soft: #3a2a22; --dec: #7aa2e8; --dec-soft: #22293a; --code: #c8c8d0; --code-soft: #2c2c31;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -.5px; }
+  h2 { font-size: 22px; margin: 56px 0 8px; letter-spacing: -.2px; }
+  h3 { font-size: 17px; margin: 28px 0 6px; }
+  p { margin: 8px 0; }
+  .lede { color: var(--muted); font-size: 18px; }
+  .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 56px; }
+  .eyebrow + h2 { margin-top: 2px; }
+  a { color: var(--dec); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88em; background: var(--sunken); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--sunken); border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.5; overflow-x: auto; margin: 10px 0; }
+  pre code { background: none; padding: 0; }
+  nav.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 18px; margin: 24px 0; }
+  nav.toc ol { margin: 4px 0; padding-left: 20px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; color: var(--muted); margin: 12px 0; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  .legend .g { --c: var(--gen); } .legend .d { --c: var(--dec); } .legend .k { --c: var(--code); }
+
+  /* fluxo do agente */
+  .flow { display: flex; flex-direction: column; align-items: stretch; gap: 0; margin: 16px 0; }
+  .step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--c); border-radius: 8px; padding: 10px 14px; }
+  .step + .arrow { }
+  .arrow { height: 18px; margin-left: 30px; border-left: 2px solid var(--line); }
+  .step .ico { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #fff; background: var(--c); }
+  .step.dec .ico { border-radius: 4px; transform: rotate(45deg); width: 24px; height: 24px; margin: 3px; }
+  .step.dec .ico b { transform: rotate(-45deg); }
+  .step.gen { --c: var(--gen); } .step.dec { --c: var(--dec); } .step.code { --c: var(--code); }
+  .step .t { font-weight: 600; }
+  .step .s { color: var(--muted); font-size: 14px; }
+  .step .q { font-size: 13px; margin-top: 4px; color: var(--dec); font-family: ui-monospace, Menlo, monospace; }
+  .branches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .branches span { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 500; border-bottom-width: 2px; }
+  .scroll { overflow-x: auto; }
+  td.num { text-align: right; white-space: nowrap; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; color: #fff; white-space: nowrap; }
+  .pill.ok { background: var(--ok); } .pill.warn { background: var(--warn); } .pill.bad { background: var(--bad); }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  @media (max-width: 680px) { .cols { grid-template-columns: 1fr; } }
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; border-top: 4px solid var(--c, var(--line)); }
+  .box.g { --c: var(--gen); } .box.d { --c: var(--dec); }
+  .box h4 { margin: 0 0 6px; font-size: 15px; color: var(--c); }
+  .note { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--dec); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 16px 0; }
+  .note.try { border-left-color: var(--gen); }
+  .note b:first-child { display: block; margin-bottom: 2px; }
+  .src { font-size: 13px; color: var(--muted); }
+  ul { padding-left: 22px; }
+  .ways { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+  @media (max-width: 760px) { .ways { grid-template-columns: 1fr; } }
+  .way { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .way .n { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .way h4 { margin: 0; font-size: 16px; }
+  .mini { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .mini div { border-radius: 6px; padding: 5px 8px; border-left: 4px solid var(--c); background: var(--sunken); }
+  .mini .g { --c: var(--gen); } .mini .d { --c: var(--dec); } .mini .k { --c: var(--code); }
+  .way ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--muted); }
+  .way .verdict { font-size: 13px; font-weight: 600; margin-top: auto; }
+  .take { counter-reset: t; list-style: none; padding: 0; }
+  .take li { counter-increment: t; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px 12px 52px; margin: 8px 0; position: relative; font-weight: 600; }
+  .take li::before { content: counter(t); position: absolute; left: 16px; top: 11px; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Workshop · modelos de decisão</p>
+  <h1>Onde o agente decide, e por que isso não precisa ser um LLM</h1>
+  <p class="lede">Um agente passa a maior parte do tempo decidindo, não escrevendo: qual caminho seguir, qual ferramenta usar, se a resposta está boa, se precisa de um humano. Cada uma dessas decisões é uma pergunta de opções fechadas. É aí que entra um modelo de decisão.</p>
+
+  <nav class="toc">
+    <ol>
+      <li><a href="#jeitos">Três jeitos de um agente decidir</a></li>
+      <li><a href="#fluxo">O fluxo de um agente</a></li>
+      <li><a href="#modelo">Como um modelo de decisão funciona</a></li>
+      <li><a href="#rota">Caso 1 · Roteamento ("Bom dia! Tudo bem?")</a></li>
+      <li><a href="#blusa">Caso 2 · Texto: a blusa e a política</a></li>
+      <li><a href="#assinatura">Caso 3 · Imagem: tem assinatura?</a></li>
+      <li><a href="#acao">De probabilidade para ação</a></li>
+      <li><a href="#fim">Três mensagens</a></li>
+    </ol>
+  </nav>
+
+  <!-- ================= 0 ================= -->
+  <p class="eyebrow" id="jeitos">1 · Ponto de partida</p>
+  <h2>Três jeitos de um agente decidir</h2>
+  <p>A mesma mensagem, <i>"Bom dia! Tudo bem?"</i>, passando por três arquiteturas. Todas respondem bem; o que muda é quanto custa, quanto demora e o quanto você enxerga e controla cada decisão.</p>
+  <div class="legend"><span class="g">gera texto (LLM)</span><span class="d">decide entre opções</span><span class="k">código</span></div>
+
+  <div class="ways">
+    <div class="way">
+      <span class="n">Jeito 1 · o mais comum</span>
+      <h4>Tudo no LLM forte</h4>
+      <div class="mini">
+        <div class="k">mensagem</div>
+        <div class="g">LLM forte + ferramentas<br><small>decide tudo por dentro e escreve</small></div>
+        <div class="k">resposta</div>
+      </div>
+      <ul>
+        <li>Simples de montar.</li>
+        <li>Paga o modelo grande até para um "bom dia".</li>
+        <li>As decisões ficam escondidas na geração: não dá para medir nem ajustar "escalar?" separadamente.</li>
+      </ul>
+      <span class="verdict">Onde a maioria está.</span>
+    </div>
+    <div class="way">
+      <span class="n">Jeito 2 · a boa prática hoje</span>
+      <h4>Uma chamada ao LLM com Pydantic por decisão</h4>
+      <div class="mini">
+        <div class="k">mensagem</div>
+        <div class="d" style="--c: var(--gen)">LLM → <code>Route(path=...)</code><br><small>JSON validado</small></div>
+        <div class="g">modelo leve escreve</div>
+      </div>
+      <ul>
+        <li>A decisão é explícita, testável e validada.</li>
+        <li>Mas cada decisão é uma geração inteira: segundos e tokens de saída.</li>
+        <li>Devolve um rótulo, sem grau de certeza.</li>
+      </ul>
+      <span class="verdict">Medido: 2,6 a 4,3 s · ~US$ 0,0018 por decisão.</span>
+    </div>
+    <div class="way">
+      <span class="n">Jeito 3 · o próximo passo</span>
+      <h4>Modelo de decisão</h4>
+      <div class="mini">
+        <div class="k">mensagem</div>
+        <div class="d">fly-jev → <code>p(modelo_leve) = 0,98</code><br><small>uma probabilidade por opção</small></div>
+        <div class="g">modelo leve escreve</div>
+      </div>
+      <ul>
+        <li>A mesma decisão explícita do jeito 2.</li>
+        <li>Em centenas de milissegundos, por uma fração do custo.</li>
+        <li>Com probabilidade: a aplicação sabe quando está em dúvida.</li>
+      </ul>
+      <span class="verdict">Medido: ~90–150 ms de processamento · ~US$ 0,000012 por decisão.</span>
+    </div>
+  </div>
+  <p class="src">Medições do roteamento da <a href="#rota">seção 4</a>, 26/10/2026, uma rodada por mensagem. O jeito 1 descreve agentes em que o LLM conduz o próprio uso de ferramentas; o jeito 2 é o padrão "routing" de <a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents (Anthropic)</a>.</p>
+
+  <div class="note">
+    <b>Roteiro sugerido para a apresentação</b>
+    Comece pelo jeito 1 (é o que quase todos têm), mostre que o jeito 2 já é uma melhoria (as decisões ficam visíveis), e apresente o jeito 3 como o passo seguinte. Depois os três casos práticos comparam o jeito 2 e o jeito 3 lado a lado: roteamento, a blusa e a assinatura.
+  </div>
+
+  <!-- ================= 1 ================= -->
+  <p class="eyebrow" id="fluxo">2 · Arquitetura</p>
+  <h2>O fluxo de um agente de atendimento</h2>
+  <p>Este é um fluxo típico, só como ilustração (o app do workshop não executa este agente inteiro). Repare em quantos passos são decisões e em quão poucos são geração de texto.</p>
+  <div class="legend"><span class="g">gera texto (LLM)</span><span class="d">decide entre opções (modelo de decisão)</span><span class="k">código da aplicação</span></div>
+
+  <div class="flow">
+    <div class="step code"><div class="ico">→</div><div><div class="t">Mensagem chega</div><div class="s">"Meu boleto venceu ontem, ainda consigo pagar?"</div></div></div>
+    <div class="arrow"></div>
+    <div class="step dec"><div class="ico"><b>1</b></div><div><div class="t">Roteamento: que tipo de atendimento é este?</div><div class="q">choice</div><div class="branches"><span>modelo leve</span><span>RAG</span><span>reasoning</span><span>humano</span></div></div></div>
+    <div class="arrow"></div>
+    <div class="step dec"><div class="ico"><b>2</b></div><div><div class="t">Precisa de ferramenta? Qual?</div><div class="q">choice</div><div class="branches"><span>consultar_boleto</span><span>gerar_segunda_via</span><span>status_matricula</span><span>nenhuma</span></div></div></div>
+    <div class="arrow"></div>
+    <div class="step code"><div class="ico">⚙</div><div><div class="t">Executa a ferramenta</div><div class="s">Chamada de API comum, código da aplicação.</div></div></div>
+    <div class="arrow"></div>
+    <div class="step dec"><div class="ico"><b>3</b></div><div><div class="t">O resultado basta para responder?</div><div class="q">noul → p(sim)</div><div class="s">Se não, volta ao passo 2 com outra ferramenta.</div></div></div>
+    <div class="arrow"></div>
+    <div class="step gen"><div class="ico">✎</div><div><div class="t">Escreve a resposta</div><div class="s">Aqui sim o LLM é insubstituível: redigir texto livre. Pode ser o modelo leve ou o forte, conforme o passo 1.</div></div></div>
+    <div class="arrow"></div>
+    <div class="step dec"><div class="ico"><b>4</b></div><div><div class="t">Guardrail: a resposta responde à pergunta e segue a política?</div><div class="q">noul → p(sim)</div></div></div>
+    <div class="arrow"></div>
+    <div class="step dec"><div class="ico"><b>5</b></div><div><div class="t">Escalar para um humano?</div><div class="q">noul, com a política de escalonamento no enunciado</div></div></div>
+    <div class="arrow"></div>
+    <div class="step code"><div class="ico">✓</div><div><div class="t">Envia, ou encaminha para a fila humana</div></div></div>
+  </div>
+
+  <h3>Cada ◆ nos jeitos 1, 2 e 3</h3>
+  <p>No jeito 1, nenhum ◆ existe como passo separado: o LLM forte decide tudo dentro da geração. Nos jeitos 2 e 3, cada ◆ vira uma chamada explícita:</p>
+  <div class="cols">
+    <div class="box g">
+      <h4>Jeito 2: cada ◆ é uma chamada ao LLM</h4>
+      <p>Um prompt pedindo JSON, validado com Pydantic. Funciona, mas cada decisão custa uma geração inteira: segundos de latência e tokens de saída. A resposta é um <code>bool</code> ou uma <code>str</code>, sem grau de certeza.</p>
+    </div>
+    <div class="box d">
+      <h4>Jeito 3: cada ◆ é uma pergunta ao modelo de decisão</h4>
+      <p>Estado + pergunta + opções → uma probabilidade por opção, em centenas de milissegundos. A aplicação decide o que fazer com a incerteza: seguir, pedir mais informação ou chamar um humano.</p>
+    </div>
+  </div>
+  <p>O modelo de decisão <b>não substitui o agente</b>. Ele tira das costas do LLM as decisões intermediárias e deixa para o LLM o que só ele faz: escrever.</p>
+
+  <!-- ================= 2 ================= -->
+  <p class="eyebrow" id="modelo">3 · Conceito</p>
+  <h2>Como um modelo de decisão funciona</h2>
+  <p>Você manda três coisas, e recebe probabilidades:</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Entrada</th><th>O que é</th><th>No fly-jev</th></tr></thead>
+    <tbody>
+      <tr><td><b>Estado</b></td><td>O contexto: a mensagem, a política da casa, o histórico, as imagens.</td><td><code>state</code> (texto ou JSON) e <code>images</code></td></tr>
+      <tr><td><b>Pergunta</b></td><td>O que precisa ser decidido, escrito como para uma pessoa nova no time.</td><td><code>instructions</code></td></tr>
+      <tr><td><b>Opções</b></td><td>As respostas possíveis, com uma descrição quando o nome sozinho é ambíguo.</td><td><code>criteria</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Há três tipos de pergunta: <code>choice</code> (uma entre várias opções), <code>noul</code> (sim ou não, devolve p(sim)) e <code>score</code> (nível numa escala). Não há texto livre na resposta: ela é sempre uma das opções que você definiu.</p>
+  <pre><code>POST https://br.fly-jev.com/v1/decisions
+{
+  "model": "fly-jev-y0-lite",
+  "state": "Cliente reclamou que o pedido não chegou.",
+  "questions": {
+    "time": { "type": "choice", "instructions": "Qual time deve atender?",
+              "criteria": { "entrega": null, "pagamentos": null, "outro": null } }
+  }
+}
+→ "answers": { "time": { "choice": "entrega",
+                         "probabilities": { "entrega": 0.91, "pagamentos": 0.06, "outro": 0.03 } } }</code></pre>
+  <p class="src">Exemplo de resposta e tipos de pergunta: <a href="https://fly-jev.com/docs/como-usar">fly-jev · Como usar</a> e <a href="https://fly-jev.com/docs/tipos-de-decisao">Tipos de decisão</a>. Modelos: <code>fly-jev-y0-lite</code> (só texto) e <code>fly-jev-y0</code> (texto + até 4 imagens).</p>
+
+  <div class="note">
+    <b>A qualidade depende do enunciado</b>
+    O mesmo modelo, com a mesma entrada, dá respostas diferentes quando a pergunta muda. Se a regra da casa não está escrita no estado ou na pergunta, nenhum modelo vai adivinhá-la. <span class="src">Ver <a href="https://fly-jev.com/casos/enunciado-curto-e-completo">fly-jev · Enunciado curto e completo</a>.</span>
+  </div>
+
+  <!-- ================= 3 ================= -->
+  <p class="eyebrow" id="rota">4 · Caso 1 · Roteamento</p>
+  <h2>Roteamento: "Bom dia! Tudo bem?" não precisa do modelo mais caro</h2>
+  <p>É o passo ◆1 do fluxo. Uma única pergunta <code>choice</code> decide o caminho da mensagem. Uma saudação vai para um modelo leve (por exemplo, <code>google/gemini-3.8-flash</code>); uma pergunta sobre regras passa pelo RAG; um pedido de cálculo vai para um modelo com reasoning; uma ameaça jurídica vai para um humano.</p>
+  <pre><code>"questions": { "rota": {
+  "type": "choice",
+  "instructions": "Qual caminho o agente deve usar para responder esta mensagem?",
+  "criteria": {
+    "modelo_leve": "saudação, agradecimento ou conversa simples, sem consultar dados",
+    "rag":         "pergunta sobre regras, prazos, preços ou informações que estão na base de conhecimento",
+    "reasoning":   "pedido que exige comparar opções, calcular ou planejar em vários passos",
+    "humano":      "reclamação grave, ameaça jurídica, fraude ou pedido explícito por um atendente"
+  }
+}}</code></pre>
+  <p>No jeito 2, a mesma pergunta e as mesmas opções vão para o LLM, e o Pydantic garante que a resposta é uma das quatro:</p>
+  <pre><code>class Route(BaseModel):
+    path: Literal["modelo_leve", "rag", "reasoning", "humano"]   # vira um enum no JSON Schema
+    reason: str</code></pre>
+  <div class="scroll"><table>
+    <thead><tr><th>Mensagem</th><th>Jeito 2 · LLM</th><th>Jeito 3 · fly-jev</th></tr></thead>
+    <tbody>
+      <tr><td>Bom dia! Tudo bem?</td><td><code>modelo_leve</code></td><td><code>modelo_leve</code> · p 0,984</td></tr>
+      <tr><td>Qual o prazo para enviar os documentos da matrícula?</td><td><code>rag</code></td><td><code>rag</code> · p 0,986</td></tr>
+      <tr><td>Tenho bolsa de 50% em dois cursos. Considerando mensalidade e transporte, qual sai mais barato em 4 anos?</td><td><code>reasoning</code></td><td><code>reasoning</code> · p 0,978</td></tr>
+      <tr><td>Já é a terceira cobrança indevida, vou entrar no Procon.</td><td><code>humano</code></td><td><code>humano</code> · p 0,978</td></tr>
+    </tbody>
+  </table></div>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th>Jeito 2 · LLM</th><th>Jeito 3 · fly-jev</th></tr></thead>
+    <tbody>
+      <tr><td>Latência total</td><td class="num">2,6 a 4,3 s</td><td class="num">0,5 a 2,3 s (processamento 90 a 102 ms)</td></tr>
+      <tr><td>Tokens</td><td class="num">~460–500 de entrada, ~76–90 de saída</td><td class="num">sem saída gerada</td></tr>
+      <tr><td>Custo por decisão</td><td class="num">US$ 0,0017 a 0,0018</td><td class="num">US$ 0,000012</td></tr>
+    </tbody>
+  </table></div>
+  <p class="src">Medido no app (aba Routing) em 26/10/2026, uma rodada por mensagem. LLM: <code>anthropic/claude-sonnet-5.5</code> via Hecate, custo de <code>usage.cost</code>. fly-jev: <code>fly-jev-y0-lite</code>, custo de <code>usage.cost_usd</code>.</p>
+  <p><b>O que observar:</b> os dois acertam as quatro. A diferença é que o jeito 3 custa ~150× menos e informa a certeza; com ela, a aplicação pode mandar para o modelo forte quando nenhuma rota está claramente na frente (o slider "trust route" do app).</p>
+  <div class="note try">
+    <b>Experimente</b>
+    Na aba Routing do app, escreva mensagens que fiquem entre duas opções ("Oi, qual o valor da mensalidade?" é saudação ou RAG?) e veja a probabilidade se dividir. Depois melhore a descrição das opções até a decisão ficar clara. Remova as descrições (<code>null</code>) e compare.
+  </div>
+
+  <!-- ================= 4 ================= -->
+  <p class="eyebrow" id="blusa">5 · Caso 2 · Texto</p>
+  <h2>A blusa: a mesma mensagem, duas decisões</h2>
+  <p>É o passo ◆5 do fluxo. Mensagem do cliente: <i>"Você tem a blusa cod 123 na cor preta?"</i> Pergunta: <i>"Esta mensagem precisa ser transferida para um atendente humano?"</i> (<code>noul</code>). A única coisa que muda é a política. <span class="src">Exemplo do <a href="https://fly-jev.com/playground">playground do fly-jev</a>.</span></p>
+
+  <h3>A política vai antes da mensagem</h3>
+  <p>A política é igual em todas as chamadas; a mensagem muda a cada uma. Colocando o trecho fixo primeiro, o provedor reaproveita o cache do prefixo e só processa o que é novo.</p>
+  <pre><code>state = "{política}\n\nMensagem do cliente: {mensagem}"     ← fly-jev (app/escalation_jev.py)
+system = "{política}\n\n{pergunta}" · user = "{mensagem}"   ← LLM     (app/escalation_llm.py)</code></pre>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Política no início do estado</th><th>fly-jev p(sim)</th><th>LLM (JSON tipado)</th></tr></thead>
+    <tbody>
+      <tr><td>(nenhuma)</td><td>0,72 → <span class="pill warn">transferir</span></td><td><code>needs_human: false</code> → <span class="pill ok">automatizar</span></td></tr>
+      <tr><td>"Considerando que o agente automático tem acesso às ferramentas de consulta de estoque e de entrega."</td><td>0,003 → <span class="pill ok">automatizar</span></td><td><code>needs_human: false</code> → <span class="pill ok">automatizar</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="src">Medido neste app em 26/10/2026, uma rodada. LLM: <code>anthropic/claude-sonnet-5.5</code> via Hecate.</p>
+  <p><b>O que observar:</b> sem política, o modelo de decisão responde à pergunta literal ("um humano deveria ver isso?") e transfere. O LLM automatiza mesmo sem política, porque <i>supõe</i> que pode consultar o estoque; a justificativa dele diz isso. Ele preencheu uma regra que ninguém escreveu. Com a política explícita, os dois concordam.</p>
+  <div class="note try">
+    <b>Experimente (aba Text do app)</b>
+    Escreva uma política de escalonamento ("só escalamos em fraude, ameaça jurídica ou risco à saúde") e teste mensagens como "Quero trocar o tamanho" e "Vou processar vocês". Depois escreva a mesma política de forma exagerada ("automatizamos tudo") e veja o modelo parar de escalar casos graves.
+  </div>
+
+  <!-- ================= 5 ================= -->
+  <p class="eyebrow" id="assinatura">6 · Caso 3 · Imagem</p>
+  <h2>Tem assinatura?</h2>
+  <p>Uma decisão multimodal: o estado inclui a imagem do documento (<code>fly-jev-y0</code>). Pergunta, igual nos dois caminhos: <i>"Does this document have a signature?"</i></p>
+  <div class="scroll"><table>
+    <thead><tr><th>Documento</th><th>fly-jev p(sim)</th><th>LLM (JSON tipado)</th></tr></thead>
+    <tbody>
+      <tr><td>Nota oficial, assinada à mão</td><td>0,877 → <span class="pill ok">aceitar</span></td><td><code>true</code> → <span class="pill ok">aceitar</span></td></tr>
+      <tr><td>A mesma nota, assinatura apagada</td><td>0,008 → <span class="pill bad">pedir reenvio</span></td><td><code>false</code> → <span class="pill bad">pedir reenvio</span></td></tr>
+      <tr><td>Contrato com o nome digitado em fonte cursiva</td><td>0,014 → <span class="pill bad">pedir reenvio</span></td><td><code>true</code> → <span class="pill ok">aceitar</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th>fly-jev</th><th>LLM</th></tr></thead>
+    <tbody>
+      <tr><td>Latência total</td><td class="num">~1,2 a 4 s (processamento ~300 ms)</td><td class="num">~4 a 5,5 s</td></tr>
+      <tr><td>Custo por imagem</td><td class="num">US$ 0,00007</td><td class="num">US$ 0,0075 a 0,0084</td></tr>
+    </tbody>
+  </table></div>
+  <p class="src">Medido neste app em 26/10/2026, duas rodadas por documento. Custos de <code>usage.cost_usd</code> (fly-jev) e <code>usage.cost</code> (Hecate). A maior parte da latência do fly-jev é rede e envio da imagem; mande JPEG em vez de PNG.</p>
+  <p><b>O que observar:</b> nos dois primeiros documentos os dois acertam; a diferença é custo e latência. No contrato eles discordam, e nenhum está "errado": um nome digitado em fonte cursiva é assinatura? Depende da regra da casa. Se a regra é "assinatura de próprio punho", ela precisa estar no enunciado.</p>
+  <div class="note try">
+    <b>Experimente (aba Image do app)</b>
+    Mude a pergunta em <code>app/signature_jev.py</code> e <code>app/signature_llm.py</code> para "assinatura de próprio punho, não nome digitado" e rode o contrato de novo. Traga fotos de documentos reais tiradas com o celular, com sombra e ângulo.
+  </div>
+
+  <!-- ================= 6 ================= -->
+  <p class="eyebrow" id="acao">7 · Política da aplicação</p>
+  <h2>De probabilidade para ação</h2>
+  <p>O modelo dá a probabilidade; a aplicação decide o que fazer. Essa regra mora em código (<code>app/policy.py</code>), não no prompt:</p>
+  <pre><code>def decide_from_jev(p_signed, accept_above=0.8, reject_below=0.3):
+    if p_signed >= accept_above: return "accept"
+    if p_signed <= reject_below: return "ask_resubmit"
+    return "human_review"          # a zona de dúvida vira revisão humana</code></pre>
+  <div class="cols">
+    <div class="box g"><h4>Com um booleano</h4><p>Só existem duas saídas. Um caso duvidoso é aceito ou rejeitado com a mesma convicção de um caso óbvio.</p></div>
+    <div class="box d"><h4>Com uma probabilidade</h4><p>Os cortes são uma escolha do negócio: mais altos quando um falso positivo custa caro. Mudar o corte não exige chamar o modelo de novo, como mostram os sliders no app.</p></div>
+  </div>
+
+  <!-- ================= 7 ================= -->
+  <p class="eyebrow" id="fim">8 · Fechamento</p>
+  <h2>Três mensagens</h2>
+  <ol class="take">
+    <li>Nem toda decisão precisa de um LLM generativo.</li>
+    <li>A qualidade depende da pergunta, do contexto e das alternativas.</li>
+    <li>O modelo fornece probabilidades; a aplicação define como agir.</li>
+  </ol>
+  <p class="src">Para rodar os casos: <a href="/">voltar ao app</a>.</p>
+</main>
+</body>
+</html>
