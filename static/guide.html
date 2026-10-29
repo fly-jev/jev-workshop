@@ -32,6 +32,8 @@
   .lede { color: var(--muted); font-size: 18px; }
   .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 56px; }
   .eyebrow + h2 { margin-top: 2px; }
+  /* respiro entre as seções (a 1ª vem logo após o sumário) */
+  .eyebrow[id]:not(#agente) { margin-top: 400px; }
   a { color: var(--dec); }
   code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88em; background: var(--sunken); padding: 1px 5px; border-radius: 4px; }
   pre { background: var(--sunken); border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.5; overflow-x: auto; margin: 10px 0; }
@@ -61,6 +63,7 @@
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
   thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 500; border-bottom-width: 2px; }
   .scroll { overflow-x: auto; }
+  table.fixed { table-layout: fixed; min-width: 520px; }
   td.num { text-align: right; white-space: nowrap; }
   .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; color: #fff; white-space: nowrap; }
   .pill.ok { background: var(--ok); } .pill.warn { background: var(--warn); } .pill.bad { background: var(--bad); }
@@ -98,6 +101,9 @@
 
   <nav class="toc">
     <ol>
+      <li><a href="#agente">O que é um agente</a></li>
+      <li><a href="#decidir">Do <code>if</code> ao modelo de decisão</a></li>
+      <li><a href="#mercado">Quem já oferece modelos de decisão</a></li>
       <li><a href="#jeitos">Três jeitos de um agente decidir</a></li>
       <li><a href="#fluxo">O fluxo de um agente</a></li>
       <li><a href="#modelo">Como um modelo de decisão funciona</a></li>
@@ -109,8 +115,90 @@
     </ol>
   </nav>
 
+  <!-- ================= A ================= -->
+  <p class="eyebrow" id="agente">1 · O que é um agente</p>
+  <h2>Um agente é uma corrente de decisões e ações</h2>
+  <p>Jogar a mensagem direto num LLM, mesmo com memória e tool calling, raramente basta. Na prática, antes e depois de o LLM escrever, alguém precisa decidir o que foi pedido, quem responde, se precisa de RAG ou de uma ferramenta, e se a resposta pode sair.</p>
+  <div class="cols">
+    <div class="box g">
+      <h4>Como parece</h4>
+      <div class="mini">
+        <div class="k">mensagem do usuário</div>
+        <div class="g">LLM + memória + tools</div>
+        <div class="k">resposta</div>
+      </div>
+    </div>
+    <div class="box d">
+      <h4>Como funciona bem</h4>
+      <div class="mini">
+        <div class="k">mensagem do usuário</div>
+        <div class="d">◆ o que foi pedido?</div>
+        <div class="d">◆ quem responde? modelo leve, forte ou humano</div>
+        <div class="d">◆ precisa de RAG ou de qual tool?</div>
+        <div class="k">⚙ executa a busca / a tool</div>
+        <div class="g">✎ LLM escreve a resposta</div>
+        <div class="d">◆ a resposta está boa? pode sair?</div>
+        <div class="k">resposta</div>
+      </div>
+    </div>
+  </div>
+  <div class="legend"><span class="d">decisão (◆)</span><span class="g">geração de texto</span><span class="k">código / dados</span></div>
+  <p>Os ◆ são a maior parte do fluxo. O fluxo completo, passo a passo, está na <a href="#fluxo">seção 5</a>.</p>
+
+  <!-- ================= B ================= -->
+  <p class="eyebrow" id="decidir">2 · Como se decide</p>
+  <h2>Do <code>if</code> ao modelo de decisão</h2>
+  <div class="scroll"><table class="fixed">
+    <colgroup><col style="width:28%"><col style="width:36%"><col style="width:36%"></colgroup>
+    <thead><tr><th>Abordagem</th><th>O que exige</th><th>Onde dói</th></tr></thead>
+    <tbody>
+      <tr><td>Regras (<code>if</code>, threshold)</td><td>escrever cada regra</td><td>não entende linguagem natural; as regras se multiplicam</td></tr>
+      <tr><td>Modelos clássicos (regressão, árvores)</td><td>features e dados rotulados</td><td>treinar, monitorar drift, re-treinar</td></tr>
+      <tr><td>Redes neurais, BERT treinado</td><td>milhares de exemplos rotulados, GPU para treinar</td><td>idem, e uma nova categoria pede novo treino</td></tr>
+      <tr><td>LLM / VLM com Pydantic</td><td>só escrever a pergunta</td><td>caro e lento: 2,6 a 4,3 s e ~US$ 0,0018 por decisão</td></tr>
+      <tr><td><b>Modelo de decisão</b></td><td>só escrever a pergunta</td><td>~100 ms de processamento e ~US$ 0,000012, com probabilidade</td></tr>
+    </tbody>
+  </table></div>
+  <p>Até o BERT, cada decisão nova é um projeto de dados: rotular, treinar e manter o modelo respondendo bem. O LLM tirou o treino do caminho, mas cobrou em dinheiro e tempo. O modelo de decisão mantém a praticidade do LLM com custo e latência de modelo pequeno.</p>
+  <p class="src">Custos e latências: medições do roteamento na <a href="#rota">seção 7</a>.</p>
+
+  <!-- ================= C ================= -->
+  <p class="eyebrow" id="mercado">3 · Mercado</p>
+  <h2>Quem já oferece modelos de decisão</h2>
+  <div class="scroll"><table class="fixed">
+    <colgroup><col style="width:34%"><col style="width:30%"><col style="width:36%"></colgroup>
+    <thead><tr><th>Modelo</th><th>De quem</th><th>Como usar</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://thenewstack.io/typesafe-jev-system-one/">Jev</a></td><td>TypeSafe AI</td><td>API (early access, set/2026)</td></tr>
+      <tr><td><a href="https://community.openai.com/t/decisions-api-is-now-available-in-public-beta/1403877">Decisions API</a></td><td>OpenAI</td><td>API</td></tr>
+      <tr><td><a href="https://ai.azure.com/catalog/models/Microsoft-Decision-1">Microsoft-Decision-1</a></td><td>Microsoft</td><td>Azure Foundry</td></tr>
+      <tr><td><a href="https://blog.cloudflare.com/clef-decision-models">Clef, Clef-flash</a></td><td>Cloudflare</td><td>Workers AI; pesos abertos</td></tr>
+      <tr><td><a href="https://huggingface.co/blog/ggml-org/decision-models-in-llamacpp">Laya, Julia-1</a></td><td>open source (BERT-like)</td><td>rodar local (llama.cpp, Ollama)</td></tr>
+      <tr><td><a href="https://fly-jev.com">fly-jev</a> (<code>y0</code>, <code>y0-lite</code>)</td><td>fly-jev</td><td>API, a usada neste workshop</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <b>Se existe modelo aberto, até BERT-like, vale pagar uma API?</b>
+    Quase sempre, sim. Em produção, o volume raramente enche a GPU (ou a CPU, no caso do BERT) a ponto de compensar manter a máquina: paga-se pelo tempo ocioso e pela operação. Quem já chama OpenAI ou Anthropic por API não troca isso por servidor próprio para economizar centavos.
+  </div>
+
+  <h3>Quanto custa a mesma decisão</h3>
+  <p>Mesmo payload: ~400 tokens de entrada. Os LLMs pensam (reasoning) e devolvem o JSON tipado: ~400 tokens de saída (~330 de raciocínio + ~70 de JSON). O modelo de decisão não gera texto.</p>
+  <div class="scroll"><table class="fixed">
+    <colgroup><col style="width:28%"><col style="width:22%"><col style="width:18%"><col style="width:18%"><col style="width:14%"></colgroup>
+    <thead><tr><th>Modelo</th><th>US$ / M tokens<br>entrada · saída</th><th>Por decisão</th><th>Por 1 milhão de decisões</th><th>vs Jev</th></tr></thead>
+    <tbody>
+      <tr><td><b>Jev</b></td><td>0,042 · 0</td><td>US$ 0,0000168</td><td>US$ 16,80</td><td><b>1×</b></td></tr>
+      <tr><td>DeepSeek V4.1 Flash</td><td>0,30 · 1,20</td><td>US$ 0,0006</td><td>US$ 600</td><td><b>~36×</b></td></tr>
+      <tr><td>GPT-6.1 Terra</td><td>1 · 5</td><td>US$ 0,0024</td><td>US$ 2.400</td><td><b>~143×</b></td></tr>
+      <tr><td>Claude Sonnet 5.5</td><td>2 · 10</td><td>US$ 0,0048</td><td>US$ 4.800</td><td><b>~286×</b></td></tr>
+    </tbody>
+  </table></div>
+  <p>A maior parte do custo do LLM está na saída: ~400 tokens de saída custam 5× os 400 de entrada no Sonnet e 4× no DeepSeek. Mesmo o LLM mais barato fica dezenas de vezes acima.</p>
+  <p class="src">Preços de tabela, sem cache nem desconto, consultados em 27/10/2026: Jev (<a href="https://www.eesel.ai/blog/typesafe-jev-pricing">eesel</a>), DeepSeek V4.1 Flash em horário de pico, a metade fora do pico (<a href="https://www.morphllm.com/deepseek-api">morphllm</a>), GPT-6.1 Terra (<a href="https://openai.com/index/introducing-gpt-6-1-terra/">OpenAI</a>), Claude Sonnet 5.5 (<a href="https://platform.claude.com/docs/en/about-claude/pricing">Anthropic</a>). Os tokens de saída são uma estimativa; o reasoning varia com o esforço configurado.</p>
+
   <!-- ================= 0 ================= -->
-  <p class="eyebrow" id="jeitos">1 · Ponto de partida</p>
+  <p class="eyebrow" id="jeitos">4 · Ponto de partida</p>
   <h2>Três jeitos de um agente decidir</h2>
   <p>A mesma mensagem, <i>"Bom dia! Tudo bem?"</i>, passando por três arquiteturas. Todas respondem bem; o que muda é quanto custa, quanto demora e o quanto você enxerga e controla cada decisão.</p>
   <div class="legend"><span class="g">gera texto (LLM)</span><span class="d">decide entre opções</span><span class="k">código</span></div>
@@ -162,15 +250,11 @@
       <span class="verdict">Medido: ~90–150 ms de processamento · ~US$ 0,000012 por decisão.</span>
     </div>
   </div>
-  <p class="src">Medições do roteamento da <a href="#rota">seção 4</a>, 26/10/2026, uma rodada por mensagem. O jeito 1 descreve agentes em que o LLM conduz o próprio uso de ferramentas; o jeito 2 é o padrão "routing" de <a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents (Anthropic)</a>.</p>
+  <p class="src">Medições do roteamento da <a href="#rota">seção 7</a>, 26/10/2026, uma rodada por mensagem. O jeito 1 descreve agentes em que o LLM conduz o próprio uso de ferramentas; o jeito 2 é o padrão "routing" de <a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents (Anthropic)</a>.</p>
 
-  <div class="note">
-    <b>Roteiro sugerido para a apresentação</b>
-    Comece pelo jeito 1 (é o que quase todos têm), mostre que o jeito 2 já é uma melhoria (as decisões ficam visíveis), e apresente o jeito 3 como o passo seguinte. Depois os três casos práticos comparam o jeito 2 e o jeito 3 lado a lado: roteamento, a blusa e a assinatura.
-  </div>
 
   <!-- ================= 1 ================= -->
-  <p class="eyebrow" id="fluxo">2 · Arquitetura</p>
+  <p class="eyebrow" id="fluxo">5 · Arquitetura</p>
   <h2>O fluxo de um agente de atendimento</h2>
   <p>Este é um fluxo típico, só como ilustração (o app do workshop não executa este agente inteiro). Repare em quantos passos são decisões e em quão poucos são geração de texto.</p>
   <div class="legend"><span class="g">gera texto (LLM)</span><span class="d">decide entre opções (modelo de decisão)</span><span class="k">código da aplicação</span></div>
@@ -210,7 +294,7 @@
   <p>O modelo de decisão <b>não substitui o agente</b>. Ele tira das costas do LLM as decisões intermediárias e deixa para o LLM o que só ele faz: escrever.</p>
 
   <!-- ================= 2 ================= -->
-  <p class="eyebrow" id="modelo">3 · Conceito</p>
+  <p class="eyebrow" id="modelo">6 · Conceito</p>
   <h2>Como um modelo de decisão funciona</h2>
   <p>Você manda três coisas, e recebe probabilidades:</p>
   <div class="scroll"><table>
@@ -241,7 +325,7 @@
   </div>
 
   <!-- ================= 3 ================= -->
-  <p class="eyebrow" id="rota">4 · Caso 1 · Roteamento</p>
+  <p class="eyebrow" id="rota">7 · Caso 1 · Roteamento</p>
   <h2>Roteamento: "Bom dia! Tudo bem?" não precisa do modelo mais caro</h2>
   <p>É o passo ◆1 do fluxo. Uma única pergunta <code>choice</code> decide o caminho da mensagem. Uma saudação vai para um modelo leve (por exemplo, <code>google/gemini-3.8-flash</code>); uma pergunta sobre regras passa pelo RAG; um pedido de cálculo vai para um modelo com reasoning; uma ameaça jurídica vai para um humano.</p>
   <pre><code>"questions": { "rota": {
@@ -258,7 +342,8 @@
   <pre><code>class Route(BaseModel):
     path: Literal["modelo_leve", "rag", "reasoning", "humano"]   # vira um enum no JSON Schema
     reason: str</code></pre>
-  <div class="scroll"><table>
+  <div class="scroll"><table class="fixed">
+    <colgroup><col style="width:46%"><col style="width:24%"><col style="width:30%"></colgroup>
     <thead><tr><th>Mensagem</th><th>Jeito 2 · LLM</th><th>Jeito 3 · fly-jev</th></tr></thead>
     <tbody>
       <tr><td>Bom dia! Tudo bem?</td><td><code>modelo_leve</code></td><td><code>modelo_leve</code> · p 0,984</td></tr>
@@ -267,12 +352,13 @@
       <tr><td>Já é a terceira cobrança indevida, vou entrar no Procon.</td><td><code>humano</code></td><td><code>humano</code> · p 0,978</td></tr>
     </tbody>
   </table></div>
-  <div class="scroll"><table>
+  <div class="scroll"><table class="fixed">
+    <colgroup><col style="width:22%"><col style="width:39%"><col style="width:39%"></colgroup>
     <thead><tr><th></th><th>Jeito 2 · LLM</th><th>Jeito 3 · fly-jev</th></tr></thead>
     <tbody>
-      <tr><td>Latência total</td><td class="num">2,6 a 4,3 s</td><td class="num">0,5 a 2,3 s (processamento 90 a 102 ms)</td></tr>
-      <tr><td>Tokens</td><td class="num">~460–500 de entrada, ~76–90 de saída</td><td class="num">sem saída gerada</td></tr>
-      <tr><td>Custo por decisão</td><td class="num">US$ 0,0017 a 0,0018</td><td class="num">US$ 0,000012</td></tr>
+      <tr><td>Latência total</td><td>2,6 a 4,3 s</td><td>0,5 a 2,3 s (processamento 90 a 102 ms)</td></tr>
+      <tr><td>Tokens</td><td>~460–500 de entrada, ~76–90 de saída</td><td>sem saída gerada</td></tr>
+      <tr><td>Custo por decisão</td><td>US$ 0,0017 a 0,0018</td><td>US$ 0,000012</td></tr>
     </tbody>
   </table></div>
   <p class="src">Medido no app (aba Routing) em 26/10/2026, uma rodada por mensagem. LLM: <code>anthropic/claude-sonnet-5.5</code> via Hecate, custo de <code>usage.cost</code>. fly-jev: <code>fly-jev-y0-lite</code>, custo de <code>usage.cost_usd</code>.</p>
@@ -283,7 +369,7 @@
   </div>
 
   <!-- ================= 4 ================= -->
-  <p class="eyebrow" id="blusa">5 · Caso 2 · Texto</p>
+  <p class="eyebrow" id="blusa">8 · Caso 2 · Texto</p>
   <h2>A blusa: a mesma mensagem, duas decisões</h2>
   <p>É o passo ◆5 do fluxo. Mensagem do cliente: <i>"Você tem a blusa cod 123 na cor preta?"</i> Pergunta: <i>"Esta mensagem precisa ser transferida para um atendente humano?"</i> (<code>noul</code>). A única coisa que muda é a política. <span class="src">Exemplo do <a href="https://fly-jev.com/playground">playground do fly-jev</a>.</span></p>
 
@@ -292,7 +378,8 @@
   <pre><code>state = "{política}\n\nMensagem do cliente: {mensagem}"     ← fly-jev (app/escalation_jev.py)
 system = "{política}\n\n{pergunta}" · user = "{mensagem}"   ← LLM     (app/escalation_llm.py)</code></pre>
 
-  <div class="scroll"><table>
+  <div class="scroll"><table class="fixed">
+    <colgroup><col style="width:40%"><col style="width:26%"><col style="width:34%"></colgroup>
     <thead><tr><th>Política no início do estado</th><th>fly-jev p(sim)</th><th>LLM (JSON tipado)</th></tr></thead>
     <tbody>
       <tr><td>(nenhuma)</td><td>0,72 → <span class="pill warn">transferir</span></td><td><code>needs_human: false</code> → <span class="pill ok">automatizar</span></td></tr>
@@ -307,7 +394,7 @@ system = "{política}\n\n{pergunta}" · user = "{mensagem}"   ← LLM     (app/e
   </div>
 
   <!-- ================= 5 ================= -->
-  <p class="eyebrow" id="assinatura">6 · Caso 3 · Imagem</p>
+  <p class="eyebrow" id="assinatura">9 · Caso 3 · Imagem</p>
   <h2>Tem assinatura?</h2>
   <p>Uma decisão multimodal: o estado inclui a imagem do documento (<code>fly-jev-y0</code>). Pergunta, igual nos dois caminhos: <i>"Does this document have a signature?"</i></p>
   <div class="scroll"><table>
@@ -333,7 +420,7 @@ system = "{política}\n\n{pergunta}" · user = "{mensagem}"   ← LLM     (app/e
   </div>
 
   <!-- ================= 6 ================= -->
-  <p class="eyebrow" id="acao">7 · Política da aplicação</p>
+  <p class="eyebrow" id="acao">10 · Política da aplicação</p>
   <h2>De probabilidade para ação</h2>
   <p>O modelo dá a probabilidade; a aplicação decide o que fazer. Essa regra mora em código (<code>app/policy.py</code>), não no prompt:</p>
   <pre><code>def decide_from_jev(p_signed, accept_above=0.8, reject_below=0.3):
@@ -345,15 +432,25 @@ system = "{política}\n\n{pergunta}" · user = "{mensagem}"   ← LLM     (app/e
     <div class="box d"><h4>Com uma probabilidade</h4><p>Os cortes são uma escolha do negócio: mais altos quando um falso positivo custa caro. Mudar o corte não exige chamar o modelo de novo, como mostram os sliders no app.</p></div>
   </div>
 
+  <div class="note try" id="rodar">
+    <b>Rodar na sua máquina</b>
+    Precisa só de Git e Docker. Código em <a href="https://github.com/fly-jev/jev-workshop">github.com/fly-jev/jev-workshop</a>.
+    <pre><code>git clone https://github.com/fly-jev/jev-workshop.git
+cd jev-workshop
+cp .env.example .env      # preencha LLM_API_KEY e JEV_API_KEY
+docker compose up</code></pre>
+    Abra <a href="http://localhost:8000">http://localhost:8000</a>. Sem as chaves, o app roda em modo simulado (respostas por heurística, sem custo nem latência reais). Se a porta 8000 estiver ocupada, use <code>APP_PORT=8088 docker compose up</code> e abra a 8088.
+  </div>
+
   <!-- ================= 7 ================= -->
-  <p class="eyebrow" id="fim">8 · Fechamento</p>
+  <p class="eyebrow" id="fim">11 · Fechamento</p>
   <h2>Três mensagens</h2>
   <ol class="take">
     <li>Nem toda decisão precisa de um LLM generativo.</li>
     <li>A qualidade depende da pergunta, do contexto e das alternativas.</li>
     <li>O modelo fornece probabilidades; a aplicação define como agir.</li>
   </ol>
-  <p class="src">Para rodar os casos: <a href="/">voltar ao app</a>.</p>
+  <p class="src">Para rodar os casos: <a href="#rodar">rodar na sua máquina</a>.</p>
 </main>
 </body>
 </html>

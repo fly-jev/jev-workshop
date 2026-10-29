@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict
 from app import mock
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://hecate.governancia.online/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "claude-opus-5-5")
+LLM_MODEL = os.getenv("LLM_MODEL", "anthropic/claude-sonnet-5.5")
 
 QUESTION = "Esta mensagem precisa ser transferida para um atendente humano?"
 

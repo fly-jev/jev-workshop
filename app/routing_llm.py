@@ -16,7 +16,7 @@ from app import mock
 from app.routes import QUESTION, ROUTES
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://hecate.governancia.online/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "claude-opus-5-5")
+LLM_MODEL = os.getenv("LLM_MODEL", "anthropic/claude-sonnet-5.5")
 
 SYSTEM = QUESTION + "\n\n" + "\n".join(f"- {name}: {desc}" for name, desc in ROUTES.items())
 
